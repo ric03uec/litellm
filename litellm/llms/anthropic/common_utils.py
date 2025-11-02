@@ -124,6 +124,7 @@ class AnthropicModelInfo(BaseLLMModelInfo):
         mcp_server_used: bool = False,
         is_vertex_request: bool = False,
         user_anthropic_beta_headers: Optional[List[str]] = None,
+        existing_headers: Optional[Dict[str, Any]] = None,
     ) -> dict:
         betas = set()
         if prompt_caching_set:
@@ -141,10 +142,24 @@ class AnthropicModelInfo(BaseLLMModelInfo):
 
         headers = {
             "anthropic-version": anthropic_version or "2023-06-01",
-            "x-api-key": api_key,
             "accept": "application/json",
             "content-type": "application/json",
         }
+
+        # OAuth passthrough support: only inject x-api-key if client doesn't provide OAuth headers
+        if existing_headers is None:
+            existing_headers = {}
+
+        # Normalize header keys to lowercase for comparison
+        existing_headers_lower = {k.lower(): v for k, v in existing_headers.items()}
+
+        # Only add x-api-key if no OAuth authentication headers are present
+        if (
+            "authorization" not in existing_headers_lower
+            and "x-api-key" not in existing_headers_lower
+            and api_key is not None
+        ):
+            headers["x-api-key"] = api_key
 
         if user_anthropic_beta_headers is not None:
             betas.update(user_anthropic_beta_headers)
@@ -194,6 +209,7 @@ class AnthropicModelInfo(BaseLLMModelInfo):
             is_vertex_request=optional_params.get("is_vertex_request", False),
             user_anthropic_beta_headers=user_anthropic_beta_headers,
             mcp_server_used=mcp_server_used,
+            existing_headers=headers,
         )
 
         headers = {**headers, **anthropic_headers}
