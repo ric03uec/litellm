@@ -61,11 +61,33 @@ class AnthropicMessagesConfig(BaseAnthropicMessagesConfig):
         api_base: Optional[str] = None,
     ) -> Tuple[dict, Optional[str]]:
         import os
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         if api_key is None:
             api_key = os.getenv("ANTHROPIC_API_KEY")
-        if "x-api-key" not in headers and api_key:
+
+        # OAuth passthrough support: only inject x-api-key if client doesn't provide OAuth headers
+        # Normalize header keys to lowercase for comparison
+        headers_lower = {k.lower(): v for k, v in headers.items()}
+
+        # Info logging for debugging OAuth
+        logger.info(f"[OAUTH] Incoming headers: {list(headers_lower.keys())}")
+        logger.info(f"[OAUTH] Has authorization: {'authorization' in headers_lower}")
+        logger.info(f"[OAUTH] Has x-api-key: {'x-api-key' in headers_lower}")
+        logger.info(f"[OAUTH] API key env var set: {api_key is not None}")
+
+        if (
+            "x-api-key" not in headers_lower
+            and "authorization" not in headers_lower
+            and api_key
+        ):
+            logger.warning("[OAUTH] NO OAUTH HEADERS - Injecting x-api-key from env")
             headers["x-api-key"] = api_key
+        else:
+            logger.info("[OAUTH] SKIPPING x-api-key injection (OAuth present or no env key)")
+
         if "anthropic-version" not in headers:
             headers["anthropic-version"] = DEFAULT_ANTHROPIC_API_VERSION
         if "content-type" not in headers:

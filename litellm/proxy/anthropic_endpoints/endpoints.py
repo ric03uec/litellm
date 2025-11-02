@@ -69,6 +69,15 @@ async def anthropic_response(  # noqa: PLR0915
             proxy_config=proxy_config,
         )
 
+        # Forward only authentication headers for OAuth passthrough
+        forwarded_headers = {}
+        if "authorization" in request.headers:
+            forwarded_headers["authorization"] = request.headers["authorization"]
+        if "x-api-key" in request.headers:
+            forwarded_headers["x-api-key"] = request.headers["x-api-key"]
+        if forwarded_headers:
+            data["headers"] = forwarded_headers
+
         # override with user settings, these are params passed via cli
         if user_temperature:
             data["temperature"] = user_temperature
