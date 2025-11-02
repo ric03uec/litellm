@@ -1052,6 +1052,24 @@ class OpenTelemetry(CustomLogger):
             ############ LLM CALL METADATA ##############
             #############################################
             metadata = standard_logging_payload["metadata"]
+
+            # Extract session-related metadata and set as proper OpenInference session attributes
+            # Phoenix requires these to be set as "session.id", "session.type", etc. (not "metadata.session_id")
+            print(f"[OTEL DEBUG] Processing metadata: {list(metadata.keys())}", flush=True)
+            if "session_id" in metadata:
+                session_id_value = metadata["session_id"]
+                print(f"[OTEL DEBUG] Setting session.id = {session_id_value}", flush=True)
+                self.safe_set_attribute(span=span, key="session.id", value=session_id_value)
+            if "session_type" in metadata:
+                print(f"[OTEL DEBUG] Setting session.type = {metadata['session_type']}", flush=True)
+                self.safe_set_attribute(span=span, key="session.type", value=metadata["session_type"])
+            if "session_prompt_version" in metadata:
+                print(f"[OTEL DEBUG] Setting session.prompt_version = {metadata['session_prompt_version']}", flush=True)
+                self.safe_set_attribute(span=span, key="session.prompt_version", value=metadata["session_prompt_version"])
+            if "session_name" in metadata:
+                print(f"[OTEL DEBUG] Setting session.name = {metadata['session_name']}", flush=True)
+                self.safe_set_attribute(span=span, key="session.name", value=metadata["session_name"])
+
             for key, value in metadata.items():
                 self.safe_set_attribute(
                     span=span, key="metadata.{}".format(key), value=value

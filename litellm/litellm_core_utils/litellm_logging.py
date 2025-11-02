@@ -4084,12 +4084,17 @@ class StandardLoggingPayloadSetup:
             _potential_requester_metadata = metadata.get(
                 "metadata", None
             )  # check if user passed metadata in the sdk request - e.g. metadata for langsmith logging - https://docs.litellm.ai/docs/observability/langsmith_integration#set-langsmith-fields
-            if (
-                clean_metadata["requester_metadata"] is None
-                and _potential_requester_metadata is not None
-                and isinstance(_potential_requester_metadata, dict)
-            ):
-                clean_metadata["requester_metadata"] = _potential_requester_metadata
+            print(f"[LOGGING DEBUG] _potential_requester_metadata = {_potential_requester_metadata}", flush=True)
+            print(f"[LOGGING DEBUG] clean_metadata['requester_metadata'] before merge = {clean_metadata.get('requester_metadata')}", flush=True)
+            if _potential_requester_metadata is not None and isinstance(_potential_requester_metadata, dict):
+                # Merge session metadata into existing requester_metadata instead of replacing it
+                if clean_metadata["requester_metadata"] is None:
+                    clean_metadata["requester_metadata"] = _potential_requester_metadata
+                    print(f"[LOGGING DEBUG] Set requester_metadata to: {clean_metadata['requester_metadata']}", flush=True)
+                else:
+                    # Update existing requester_metadata with session metadata
+                    clean_metadata["requester_metadata"].update(_potential_requester_metadata)
+                    print(f"[LOGGING DEBUG] Merged requester_metadata to: {clean_metadata['requester_metadata']}", flush=True)
 
         if (
             EnterpriseStandardLoggingPayloadSetupVAR
@@ -4575,6 +4580,30 @@ def get_standard_logging_object_payload(
             or litellm_params.get("metadata", None)
             or {}
         )
+        print(f"[LOGGING DEBUG] litellm_params.get('metadata') = {litellm_params.get('metadata')}", flush=True)
+        print(f"[LOGGING DEBUG] metadata keys = {list(metadata.keys()) if metadata else None}", flush=True)
+
+        # Inject session metadata from environment variables for Phoenix filtering
+        import os
+        session_id = os.getenv("PHOENIX_SESSION_ID")
+        session_type = os.getenv("PHOENIX_SESSION_TYPE")
+        prompt_version = os.getenv("PHOENIX_PROMPT_VERSION")
+        session_name = os.getenv("PHOENIX_SESSION_NAME")
+        if session_id or session_type or prompt_version or session_name:
+            if "metadata" not in metadata:
+                metadata["metadata"] = {}
+            if session_id:
+                metadata["metadata"]["session_id"] = session_id
+                print(f"[LOGGING] Injected session_id from env: {session_id}", flush=True)
+            if session_type:
+                metadata["metadata"]["session_type"] = session_type
+                print(f"[LOGGING] Injected session_type from env: {session_type}", flush=True)
+            if prompt_version:
+                metadata["metadata"]["session_prompt_version"] = prompt_version
+                print(f"[LOGGING] Injected session_prompt_version from env: {prompt_version}", flush=True)
+            if session_name:
+                metadata["metadata"]["session_name"] = session_name
+                print(f"[LOGGING] Injected session_name from env: {session_name}", flush=True)
 
         completion_start_time = kwargs.get("completion_start_time", end_time)
         call_type = kwargs.get("call_type")

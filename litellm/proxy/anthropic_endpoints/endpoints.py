@@ -78,6 +78,11 @@ async def anthropic_response(  # noqa: PLR0915
         if forwarded_headers:
             data["headers"] = forwarded_headers
 
+        # Inject session metadata from environment variables for Phoenix filtering
+        from litellm.proxy.session_metadata_middleware import inject_session_metadata
+        data = inject_session_metadata(data)
+        print(f"[ENDPOINTS DEBUG] data['metadata'] after injection: {data.get('metadata', {})}", flush=True)
+
         # override with user settings, these are params passed via cli
         if user_temperature:
             data["temperature"] = user_temperature

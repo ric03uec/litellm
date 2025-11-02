@@ -46,6 +46,7 @@ def set_attributes(span: Span, kwargs, response_obj):  # noqa: PLR0915
         ToolCallAttributes,
     )
 
+    print("[PHOENIX DEBUG] set_attributes() called", flush=True)
     try:
         optional_params = kwargs.get("optional_params", {})
         litellm_params = kwargs.get("litellm_params", {})
@@ -65,7 +66,37 @@ def set_attributes(span: Span, kwargs, response_obj):  # noqa: PLR0915
             if standard_logging_payload
             else None
         )
+        print(f"[PHOENIX DEBUG] metadata = {metadata}", flush=True)
         if metadata is not None:
+            print(f"[PHOENIX DEBUG] metadata keys = {list(metadata.keys())}", flush=True)
+
+            # Session metadata can be in two places:
+            # 1. metadata["session_id"] (direct)
+            # 2. metadata["requester_metadata"]["session_id"] (from proxy endpoints)
+            requester_metadata = metadata.get("requester_metadata", {})
+
+            # Extract session-related metadata and set as proper OpenInference attributes
+            session_id = metadata.get("session_id") or requester_metadata.get("session_id")
+            if session_id:
+                print(f"[PHOENIX DEBUG] Setting session.id = {session_id}", flush=True)
+                print(f"[PHOENIX DEBUG] SpanAttributes.SESSION_ID = {SpanAttributes.SESSION_ID}", flush=True)
+                safe_set_attribute(span, SpanAttributes.SESSION_ID, session_id)
+                print(f"[PHOENIX DEBUG] session.id attribute set successfully", flush=True)
+
+            session_type = metadata.get("session_type") or requester_metadata.get("session_type")
+            if session_type:
+                safe_set_attribute(span, "session.type", session_type)
+                print(f"[PHOENIX DEBUG] session.type = {session_type}", flush=True)
+
+            session_prompt_version = metadata.get("session_prompt_version") or requester_metadata.get("session_prompt_version")
+            if session_prompt_version:
+                safe_set_attribute(span, "session.prompt_version", session_prompt_version)
+
+            session_name = metadata.get("session_name") or requester_metadata.get("session_name")
+            if session_name:
+                safe_set_attribute(span, "session.name", session_name)
+
+            # Set the full metadata as JSON for other fields
             safe_set_attribute(span, SpanAttributes.METADATA, safe_dumps(metadata))
 
         #############################################
